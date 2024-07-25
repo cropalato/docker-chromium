@@ -1,0 +1,44 @@
+version: "3.5"
+services:
+  vpn:
+    container_name: vpn
+    image: dperson/openvpn-client:latest
+    cap_add:
+      - net_admin # required to modify network interfaces
+    restart: unless-stopped
+    volumes:
+      - /dev/net:/dev/net:z # tun device
+      - ${ROOT}/config/vpn2:/vpn # OpenVPN configuration
+    security_opt:
+      - label:disable
+    ports:
+      - 8112:8112 # port for deluge web UI to be reachable from local network
+    command: '-f "" -r 192.168.1.0/24' # enable firewall and route local network traffic
+
+  chromium:
+    container_name: chromium
+    image: docker-chromium:latest
+    privileged: true
+    shm_size: 4096m
+    restart: unless-stopped
+    network_mode: service:vpn
+    environment:
+      - XDG_RUNTIME_DIR=/run/user/${PUID}/
+      - NVIDIA_DRIVER_CAPABILITIES=graphics
+      - DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${PUID}/bus
+      - DISPLAY=$DISPLAY
+    volumes:
+      - type: bind
+        source: /tmp/.X11-unix
+        target: /tmp/.X11-unix
+      - type: bind
+        source: /run/user/${PUID}/pipewire-0
+        target: /run/user/${PUID}/pipewire-0
+      - type: bind
+        source: /run/user/${PUID}/bus
+        target: /run/user/${PUID}/bus
+      - type: bind
+        source: /run/dbus/system_bus_socket
+        target: /run/dbus/system_bus_socket
+    command: chromium
+        
